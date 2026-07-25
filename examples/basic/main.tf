@@ -4,7 +4,7 @@ terraform {
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = ">= 3.0"
+      version = ">= 3.63.0, < 5.0"
     }
   }
 }
@@ -21,6 +21,10 @@ module "app_service" {
   resource_group_name = "example-rg"
   location            = "eastus"
   sku_name            = "B1"
+
+  # A managed identity lets app settings reference Key Vault secrets instead of
+  # carrying them as plaintext values.
+  identity_type = "SystemAssigned"
 
   app_settings = {
     WEBSITES_PORT = "8080"

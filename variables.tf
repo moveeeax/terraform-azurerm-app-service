@@ -31,7 +31,7 @@ variable "https_only" {
 }
 
 variable "always_on" {
-  description = "Whether the web app is always kept loaded. Not supported on some free/shared SKUs."
+  description = "Whether the web app is always kept loaded. Must be false when sku_name is \"F1\" (Free) or \"D1\" (Shared); those service plans do not support Always On."
   type        = bool
   default     = true
 }
@@ -93,7 +93,7 @@ variable "identity_ids" {
 }
 
 variable "key_vault_reference_identity_id" {
-  description = "ID of the user-assigned identity used to resolve @Microsoft.KeyVault() app settings. Null uses the system-assigned identity."
+  description = "ID of the user-assigned identity used to resolve @Microsoft.KeyVault() app settings. Null uses the system-assigned identity. Requires identity_type to be set: the referenced identity must be attached via the identity block."
   type        = string
   default     = null
 }
@@ -105,7 +105,7 @@ variable "docker_image_name" {
 }
 
 variable "docker_registry_url" {
-  description = "URL of the container registry hosting the image, e.g. https://index.docker.io."
+  description = "URL of the container registry hosting the image, e.g. https://index.docker.io. Only takes effect when docker_image_name is also set."
   type        = string
   default     = null
 }

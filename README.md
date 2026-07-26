@@ -48,6 +48,14 @@ you need the endpoint. `minimum_tls_version` and `ftps_state` are set explicitly
 on the resource rather than left to the provider's own defaults, so the module's
 posture cannot silently weaken across a provider upgrade.
 
+### `always_on` on Free and Shared plans
+
+`always_on` defaults to `true`, but the Free (`sku_name = "F1"`) and Shared
+(`sku_name = "D1"`) service plans don't support it — Azure rejects the apply
+with "Always On is not supported for Free or Shared plans." A plan-time
+precondition catches this combination before it reaches Azure; set
+`always_on = false` explicitly when using either of those SKUs.
+
 ### Secrets in app settings
 
 `app_settings` values are written to state and, without this module's
@@ -67,6 +75,9 @@ Use `key_vault_reference_identity_id` when the vault should be reached through a
 specific user-assigned identity rather than the system-assigned one. The
 identity's principal ID is exposed as the `identity_principal_id` output so you
 can wire up the Key Vault access policy or role assignment.
+`key_vault_reference_identity_id` requires `identity_type` to be set — the
+identity it names must actually be attached via the `identity` block, so
+setting it with no identity attached is rejected at plan time.
 
 ## Requirements
 
@@ -94,16 +105,16 @@ Running the test suite additionally needs Terraform or OpenTofu >= 1.7 for
 | `location`            | Azure region in which to create the resources.                     | `string`      | n/a     |   yes    |
 | `sku_name`            | SKU of the service plan.                                           | `string`      | `"B1"`  |    no    |
 | `https_only`          | Whether the web app redirects all HTTP traffic to HTTPS.           | `bool`        | `true`  |    no    |
-| `always_on`           | Whether the web app is always kept loaded.                         | `bool`        | `true`  |    no    |
+| `always_on`           | Whether the web app is always kept loaded. Must be `false` on `F1`/`D1` SKUs. | `bool` | `true`  |    no    |
 | `minimum_tls_version` | Minimum TLS version for inbound HTTPS. One of `1.2`, `1.3`.        | `string`      | `"1.2"` |    no    |
 | `ftps_state`          | FTP/FTPS endpoint state. One of `Disabled`, `FtpsOnly`.            | `string`      | `"Disabled"` | no  |
 | `client_certificate_enabled` | Whether a TLS client certificate is requested from callers. | `bool`        | `false` |    no    |
 | `client_certificate_mode` | Client certificate handling: `Required`, `Optional`, `OptionalInteractiveUser`. | `string` | `"Required"` | no |
 | `identity_type`       | Managed identity: `SystemAssigned`, `UserAssigned`, `"SystemAssigned, UserAssigned"`, or null for none. | `string` | `null` | no |
 | `identity_ids`        | User-assigned identity IDs. Required when `identity_type` includes `UserAssigned`. | `list(string)` | `[]` | no |
-| `key_vault_reference_identity_id` | Identity used to resolve `@Microsoft.KeyVault()` app settings. | `string` | `null` | no |
+| `key_vault_reference_identity_id` | Identity used to resolve `@Microsoft.KeyVault()` app settings. Requires `identity_type`. | `string` | `null` | no |
 | `docker_image_name`   | Docker image and tag to run. Null runs the default runtime.        | `string`      | `null`  |    no    |
-| `docker_registry_url` | URL of the container registry hosting the image.                   | `string`      | `null`  |    no    |
+| `docker_registry_url` | URL of the container registry hosting the image. Only effective with `docker_image_name` set. | `string` | `null` |    no    |
 | `app_settings`        | Application settings exposed as environment variables. Sensitive.  | `map(string)` | `{}`    |    no    |
 | `tags`                | Map of tags applied to the resources.                              | `map(string)` | `{}`    |    no    |
 

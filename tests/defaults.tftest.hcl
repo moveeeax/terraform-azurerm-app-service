@@ -142,3 +142,82 @@ run "system_assigned_identity_is_attached" {
     error_message = "identity_type should attach a system-assigned identity."
   }
 }
+
+# Regression guard: Free and Shared service plans reject always_on = true at
+# apply time ("Always On is not supported for Free or Shared plans"). The
+# module's own always_on default is true, so picking sku_name = "F1" without
+# also overriding always_on must fail at plan time, not at apply time against
+# the Azure API.
+run "rejects_always_on_with_free_sku" {
+  command = plan
+
+  variables {
+    sku_name = "F1"
+  }
+
+  expect_failures = [azurerm_linux_web_app.this]
+}
+
+run "rejects_always_on_with_shared_sku" {
+  command = plan
+
+  variables {
+    sku_name = "D1"
+  }
+
+  expect_failures = [azurerm_linux_web_app.this]
+}
+
+run "allows_always_on_disabled_on_free_sku" {
+  command = plan
+
+  variables {
+    sku_name  = "F1"
+    always_on = false
+  }
+
+  assert {
+    condition     = azurerm_linux_web_app.this.site_config[0].always_on == false
+    error_message = "always_on = false must be accepted on the F1 (Free) service plan."
+  }
+}
+
+# Regression guard: key_vault_reference_identity_id references an identity
+# that must actually be attached via the identity block, otherwise the
+# @Microsoft.KeyVault() reference has nothing to authenticate with.
+run "rejects_key_vault_reference_identity_without_identity" {
+  command = plan
+
+  variables {
+    key_vault_reference_identity_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/test-id"
+  }
+
+  expect_failures = [azurerm_linux_web_app.this]
+}
+
+run "allows_key_vault_reference_identity_with_identity" {
+  command = plan
+
+  variables {
+    identity_type                   = "SystemAssigned"
+    key_vault_reference_identity_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/test-id"
+  }
+
+  assert {
+    condition     = azurerm_linux_web_app.this.key_vault_reference_identity_id == "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test-rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/test-id"
+    error_message = "key_vault_reference_identity_id should be accepted when an identity is attached."
+  }
+}
+
+# Regression guard: docker_registry_url is only rendered inside
+# application_stack, which requires docker_image_name. Setting the registry
+# URL alone silently does nothing without this check.
+run "rejects_docker_registry_url_without_image" {
+  command = plan
+
+  variables {
+    docker_registry_url = "https://index.docker.io"
+  }
+
+  expect_failures = [azurerm_linux_web_app.this]
+}

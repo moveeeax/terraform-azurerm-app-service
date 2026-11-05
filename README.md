@@ -9,7 +9,7 @@ hostname.
 
 ```hcl
 module "app_service" {
-  source = "github.com/moveeeax/terraform-azurerm-app-service"
+  source = "github.com/moveeeax/terraform-azurerm-app-service?ref=v1.0.0"
 
   name                = "prod-webapp01"
   service_plan_name   = "prod-asp"
@@ -84,13 +84,17 @@ setting it with no identity attached is rejected at plan time.
 | Name      | Version              |
 |-----------|----------------------|
 | terraform | >= 1.5               |
-| azurerm   | >= 3.63.0, < 5.0     |
+| azurerm   | >= 3.63.0, < 6.0     |
 
 The azurerm floor is not cosmetic: `site_config.application_stack` only gained
 `docker_image_name` and `docker_registry_url` in azurerm **3.63.0** (they
 replaced `docker_image`/`docker_image_tag`, which 4.0 removed). On 3.62.1 and
 older this module fails with `An argument named "docker_image_name" is not
 expected here`.
+
+The ceiling is `< 6.0`: CI runs against the latest azurerm 5.x. The 5.0
+removals on `azurerm_linux_web_app` (`ruby_version`, the VS2017/VS2019 remote
+debugging versions) are not used by this module.
 
 Running the test suite additionally needs Terraform or OpenTofu >= 1.7 for
 `mock_provider`; the module itself does not.

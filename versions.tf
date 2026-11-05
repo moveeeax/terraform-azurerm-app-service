@@ -8,8 +8,9 @@ terraform {
       # `docker_image`/`docker_image_tag`, which were removed in 4.0). Anything
       # older than 3.63.0 fails with "An argument named docker_image_name is
       # not expected here", so 3.63.0 is the real floor for this module.
+      # Ceiling: tested against azurerm 5.x; 6.0 has not been vetted.
       source  = "hashicorp/azurerm"
-      version = ">= 3.63.0, < 5.0"
+      version = ">= 3.63.0, < 6.0"
     }
   }
 }

@@ -99,15 +99,73 @@ variable "key_vault_reference_identity_id" {
 }
 
 variable "docker_image_name" {
-  description = "Docker image and tag to run, e.g. nginx:latest. Null runs the default runtime."
+  description = "Docker image and tag to run, e.g. nginx:latest. Shorthand for application_stack.docker_image_name; cannot be combined with application_stack. Null runs the default runtime unless application_stack is set."
   type        = string
   default     = null
 }
 
 variable "docker_registry_url" {
-  description = "URL of the container registry hosting the image, e.g. https://index.docker.io. Only takes effect when docker_image_name is also set."
+  description = "URL of the container registry hosting the image, e.g. https://index.docker.io. Only takes effect when docker_image_name is also set. Shorthand for application_stack.docker_registry_url; cannot be combined with application_stack."
   type        = string
   default     = null
+}
+
+variable "application_stack" {
+  description = <<-EOT
+    Runtime of the web app. Set exactly one of docker_image_name, dotnet_version,
+    go_version, java_version, node_version, php_version or python_version.
+    java_version also needs java_server and java_server_version; docker_registry_url
+    only applies with docker_image_name. Allowed version strings are validated by
+    the azurerm provider. Null falls back to docker_image_name/docker_registry_url,
+    and to the default runtime when those are null too. Cannot be combined with
+    docker_image_name or docker_registry_url.
+  EOT
+  type = object({
+    docker_image_name   = optional(string)
+    docker_registry_url = optional(string)
+    dotnet_version      = optional(string)
+    go_version          = optional(string)
+    java_version        = optional(string)
+    java_server         = optional(string)
+    java_server_version = optional(string)
+    node_version        = optional(string)
+    php_version         = optional(string)
+    python_version      = optional(string)
+  })
+  default = null
+
+  # Mirrors the provider's ExactlyOneOf on application_stack so a bad
+  # combination fails at plan time with a message naming the input.
+  validation {
+    condition = var.application_stack == null ? true : length([
+      for v in [
+        var.application_stack.docker_image_name,
+        var.application_stack.dotnet_version,
+        var.application_stack.go_version,
+        var.application_stack.java_version,
+        var.application_stack.node_version,
+        var.application_stack.php_version,
+        var.application_stack.python_version,
+      ] : v if v != null
+    ]) == 1
+    error_message = "application_stack must set exactly one of docker_image_name, dotnet_version, go_version, java_version, node_version, php_version or python_version."
+  }
+
+  # The provider requires java_version, java_server and java_server_version
+  # together (RequiredWith on each of them).
+  validation {
+    condition = var.application_stack == null ? true : length(compact([
+      var.application_stack.java_version,
+      var.application_stack.java_server,
+      var.application_stack.java_server_version,
+    ])) % 3 == 0
+    error_message = "application_stack.java_version, java_server and java_server_version must be set together."
+  }
+
+  validation {
+    condition     = var.application_stack == null ? true : (var.application_stack.docker_registry_url == null || var.application_stack.docker_image_name != null)
+    error_message = "application_stack.docker_registry_url has no effect unless application_stack.docker_image_name is also set."
+  }
 }
 
 variable "app_settings" {

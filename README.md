@@ -2,8 +2,8 @@
 
 Terraform module that manages an [Azure](https://azure.microsoft.com/) App
 Service on Linux. It creates a service plan and a Linux web app together,
-supports running a custom container image, and exposes the app's default
-hostname.
+runs either a custom container image or a code stack (.NET, Go, Java, Node.js,
+PHP, Python), and exposes the app's default hostname.
 
 ## Usage
 
@@ -31,6 +31,41 @@ module "app_service" {
 ```
 
 A runnable example lives in [`examples/basic`](examples/basic).
+
+## Application stack
+
+`application_stack` selects the runtime. Set exactly one of
+`docker_image_name`, `dotnet_version`, `go_version`, `java_version`,
+`node_version`, `php_version` or `python_version`:
+
+```hcl
+application_stack = {
+  node_version = "20-lts"
+}
+```
+
+Java needs all three of `java_version`, `java_server` and
+`java_server_version` (the provider requires them together):
+
+```hcl
+application_stack = {
+  java_version        = "17"
+  java_server         = "JAVA"
+  java_server_version = "17"
+}
+```
+
+The allowed version strings depend on the azurerm version in use and are
+validated by the provider, not by this module. Ruby is not offered:
+`ruby_version` was removed in azurerm 5.0.
+
+The top-level `docker_image_name` and `docker_registry_url` inputs still work
+and remain the way to run a container; they are a shorthand for
+`application_stack = { docker_image_name = ..., docker_registry_url = ... }` and
+render the same block as before. Use one style or the other: setting
+`application_stack` together with either top-level docker input is rejected at
+plan time. With neither set, no `application_stack` block is rendered, as
+before.
 
 ## Security defaults
 
@@ -117,8 +152,9 @@ Running the test suite additionally needs Terraform or OpenTofu >= 1.7 for
 | `identity_type`       | Managed identity: `SystemAssigned`, `UserAssigned`, `"SystemAssigned, UserAssigned"`, or null for none. | `string` | `null` | no |
 | `identity_ids`        | User-assigned identity IDs. Required when `identity_type` includes `UserAssigned`. | `list(string)` | `[]` | no |
 | `key_vault_reference_identity_id` | Identity used to resolve `@Microsoft.KeyVault()` app settings. Requires `identity_type`. | `string` | `null` | no |
-| `docker_image_name`   | Docker image and tag to run. Null runs the default runtime.        | `string`      | `null`  |    no    |
-| `docker_registry_url` | URL of the container registry hosting the image. Only effective with `docker_image_name` set. | `string` | `null` |    no    |
+| `application_stack`   | Runtime: exactly one of `docker_image_name`, `dotnet_version`, `go_version`, `java_version` (with `java_server`, `java_server_version`), `node_version`, `php_version`, `python_version`; optional `docker_registry_url` with an image. Cannot be combined with the top-level docker inputs. See [Application stack](#application-stack). | `object({...})` | `null` | no |
+| `docker_image_name`   | Docker image and tag to run. Shorthand for `application_stack.docker_image_name`. Null runs the default runtime unless `application_stack` is set. | `string` | `null` | no |
+| `docker_registry_url` | URL of the container registry hosting the image. Only effective with `docker_image_name` set. Shorthand for `application_stack.docker_registry_url`. | `string` | `null` | no |
 | `app_settings`        | Application settings exposed as environment variables. Sensitive.  | `map(string)` | `{}`    |    no    |
 | `tags`                | Map of tags applied to the resources.                              | `map(string)` | `{}`    |    no    |
 

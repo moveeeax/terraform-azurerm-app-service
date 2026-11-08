@@ -1,3 +1,24 @@
+locals {
+  # The top-level docker_image_name/docker_registry_url inputs predate
+  # application_stack and stay supported as a shorthand for a container stack.
+  # They render exactly the block they rendered before, so existing callers get
+  # an unchanged plan.
+  application_stack = var.application_stack != null ? var.application_stack : (
+    var.docker_image_name == null ? null : {
+      docker_image_name   = var.docker_image_name
+      docker_registry_url = var.docker_registry_url
+      dotnet_version      = null
+      go_version          = null
+      java_version        = null
+      java_server         = null
+      java_server_version = null
+      node_version        = null
+      php_version         = null
+      python_version      = null
+    }
+  )
+}
+
 resource "azurerm_service_plan" "this" {
   name                = var.service_plan_name
   resource_group_name = var.resource_group_name
@@ -28,16 +49,24 @@ resource "azurerm_linux_web_app" "this" {
     ftps_state          = var.ftps_state
 
     # `application_stack` requires exactly one of docker_image_name,
-    # dotnet_version, go_version, java_version, node_version, php_version,
-    # python_version or ruby_version. Emitting the block with a null
-    # docker_image_name fails the provider's ExactlyOneOf check, so the block is
-    # only rendered when an image is actually requested.
+    # dotnet_version, go_version, java_version, node_version, php_version or
+    # python_version. Emitting the block with all of them null fails the
+    # provider's ExactlyOneOf check, so the block is only rendered when a stack
+    # is actually requested (see local.application_stack).
     dynamic "application_stack" {
-      for_each = var.docker_image_name == null ? [] : [var.docker_image_name]
+      for_each = local.application_stack == null ? [] : [local.application_stack]
 
       content {
-        docker_image_name   = application_stack.value
-        docker_registry_url = var.docker_registry_url
+        docker_image_name   = application_stack.value.docker_image_name
+        docker_registry_url = application_stack.value.docker_registry_url
+        dotnet_version      = application_stack.value.dotnet_version
+        go_version          = application_stack.value.go_version
+        java_version        = application_stack.value.java_version
+        java_server         = application_stack.value.java_server
+        java_server_version = application_stack.value.java_server_version
+        node_version        = application_stack.value.node_version
+        php_version         = application_stack.value.php_version
+        python_version      = application_stack.value.python_version
       }
     }
   }
@@ -94,6 +123,14 @@ resource "azurerm_linux_web_app" "this" {
     precondition {
       condition     = var.docker_image_name != null || var.docker_registry_url == null
       error_message = "docker_registry_url has no effect unless docker_image_name is also set."
+    }
+
+    # docker_image_name and docker_registry_url are kept as shorthands for a
+    # container stack. Combining them with application_stack would leave it
+    # ambiguous which one wins, so the two styles are mutually exclusive.
+    precondition {
+      condition     = var.application_stack == null || (var.docker_image_name == null && var.docker_registry_url == null)
+      error_message = "Set either application_stack or docker_image_name/docker_registry_url, not both. Move the image into application_stack.docker_image_name."
     }
   }
 }
